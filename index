@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON to Gemini Prompt Converter</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 800px;
+            margin-bottom: 20px;
+        }
+
+        h1, h2 {
+            color: #1a73e8; /* Google Blue */
+            text-align: center;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #5f6368;
+        }
+
+        textarea, input[type="text"], input[type="password"] {
+            width: calc(100% - 24px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        button {
+            background-color: #1a73e8;
+            color: white;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s ease;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background-color: #1765cc;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .api-key-management, .json-input-area, .output-area {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .api-key-management:last-child, .json-input-area:last-child, .output-area:last-child {
+            border-bottom: none;
+        }
+
+        #apiKeyList li {
+            background-color: #e8f0fe;
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #apiKeyList button {
+            background-color: #d93025; /* Google Red */
+            font-size: 0.8rem;
+            padding: 5px 10px;
+        }
+        #apiKeyList button:hover {
+            background-color: #c5221f;
+        }
+
+        .output-box {
+            margin-top: 15px;
+            padding: 15px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            white-space: pre-wrap; /* Preserve formatting of the prompt */
+            word-break: break-word;
+        }
+        .output-box h3 {
+            margin-top: 0;
+            color: #1a73e8;
+        }
+
+        .status-message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .status-message.success {
+            background-color: #e6f4ea;
+            color: #1e8e3e;
+            border: 1px solid #a8d8b6;
+        }
+        .status-message.error {
+            background-color: #fce8e6;
+            color: #d93025;
+            border: 1px solid #f7c4c0;
+        }
+        .status-message.info {
+            background-color: #e8f0fe;
+            color: #1967d2;
+            border: 1px solid #aecbfa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JSON to Gemini AI Prompt Converter</h1>
+
+        <div class="api-key-management">
+            <h2>Manajemen API Key Gemini</h2>
+            <label for="apiKeyInput">Masukkan API Key Gemini:</label>
+            <input type="password" id="apiKeyInput" placeholder="AIzaSy...">
+            <button id="addApiKeyButton">Tambah Key</button>
+            <button id="clearApiKeysButton">Hapus Semua Key</button>
+            <h3>API Keys Tersimpan:</h3>
+            <ul id="apiKeyList"></ul>
+        </div>
+
+        <div class="json-input-area">
+            <h2>Input JSON</h2>
+            <label for="jsonInput">Masukkan JSON di sini:</label>
+            <textarea id="jsonInput" placeholder='Contoh JSON ada di kode sumber'></textarea>
+            <button id="generatePromptButton" disabled>Generate Prompt dengan Gemini</button>
+        </div>
+
+        <div class="output-area">
+            <h2>Hasil</h2>
+            <div id="statusContainer"></div>
+            <div id="processingInfo" class="output-box" style="display:none;">
+                <h3>Deskripsi dari JSON (Untuk Gemini):</h3>
+                <p id="intermediateDescription"></p>
+            </div>
+            <div id="finalPrompt" class="output-box" style="display:none;">
+                <h3>Prompt dari Gemini:</h3>
+                <p id="geminiPromptOutput"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GEMINI_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=';
+
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const addApiKeyButton = document.getElementById('addApiKeyButton');
+        const clearApiKeysButton = document.getElementById('clearApiKeysButton');
+        const apiKeyListElement = document.getElementById('apiKeyList');
+        const jsonInput = document.getElementById('jsonInput');
+        const generatePromptButton = document.getElementById('generatePromptButton');
+        const statusContainer = document.getElementById('statusContainer');
+        
+        const processingInfoDiv = document.getElementById('processingInfo');
+        const intermediateDescriptionP = document.getElementById('intermediateDescription');
+        
+        const finalPromptDiv = document.getElementById('finalPrompt');
+        const geminiPromptOutputP = document.getElementById('geminiPromptOutput');
+
+        let apiKeys = [];
+        let busyApiKeys = new Set(); // Untuk melacak API key yang sedang digunakan
+
+        // --- Manajemen API Key ---
+        function loadApiKeys() {
+            const storedKeys = localStorage.getItem('geminiApiKeys');
+            if (storedKeys) {
+                apiKeys = JSON.parse(storedKeys);
+            }
+            renderApiKeys();
+            updateGenerateButtonState();
+        }
+
+        function saveApiKeys() {
+            localStorage.setItem('geminiApiKeys', JSON.stringify(apiKeys));
+            updateGenerateButtonState();
+        }
+
+        function addApiKey() {
+            const key = apiKeyInput.value.trim();
+            if (key && !apiKeys.includes(key)) {
+                apiKeys.push(key);
+                apiKeyInput.value = '';
+                saveApiKeys();
+                renderApiKeys();
+                displayStatus('API Key berhasil ditambahkan.', 'success');
+            } else if (apiKeys.includes(key)) {
+                displayStatus('API Key tersebut sudah ada.', 'info');
+            } else {
+                displayStatus('API Key tidak boleh kosong.', 'error');
+            }
+        }
+
+        function removeApiKey(keyToRemove) {
+            apiKeys = apiKeys.filter(key => key !== keyToRemove);
+            busyApiKeys.delete(keyToRemove); // Hapus juga dari busy set jika ada
+            saveApiKeys();
+            renderApiKeys();
+            displayStatus('API Key berhasil dihapus.', 'success');
+        }
+        
+        function clearAllApiKeys() {
+            if (confirm("Apakah Anda yakin ingin menghapus semua API Key?")) {
+                apiKeys = [];
+                busyApiKeys.clear();
+                saveApiKeys();
+                renderApiKeys();
+                displayStatus('Semua API Key telah dihapus.', 'success');
+            }
+        }
+
+        function renderApiKeys() {
+            apiKeyListElement.innerHTML = '';
+            if (apiKeys.length === 0) {
+                apiKeyListElement.innerHTML = '<li>Belum ada API Key tersimpan.</li>';
+            } else {
+                apiKeys.forEach(key => {
+                    const li = document.createElement('li');
+                    const keyText = document.createElement('span');
+                    keyText.textContent = `••••${key.slice(-8)}`; // Tampilkan sebagian untuk keamanan
+                    
+                    const removeButton = document.createElement('button');
+                    removeButton.textContent = 'Hapus';
+                    removeButton.onclick = () => removeApiKey(key);
+                    
+                    li.appendChild(keyText);
+                    li.appendChild(removeButton);
+                    apiKeyListElement.appendChild(li);
+                });
+            }
+        }
+
+        function updateGenerateButtonState() {
+            generatePromptButton.disabled = apiKeys.length === 0;
+        }
+        
+        // --- Konversi JSON ke Deskripsi ---
+        function jsonToDescription(obj, prefix = "") {
+            let description = "";
+            for (const key in obj) {
+                if (Object.hasOwnProperty.call(obj, key)) {
+                    const value = obj[key];
+                    const currentKey = prefix ? `${prefix} ${key}` : key;
+
+                    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                        description += jsonToDescription(value, currentKey) + ", ";
+                    } else if (Array.isArray(value)) {
+                        description += `${formatKey(currentKey)}: ${value.join(', ')}, `;
+                    } else {
+                        description += `${formatKey(currentKey)} is ${value}, `;
+                    }
+                }
+            }
+            return description.replace(/, $/, ''); // Hapus koma terakhir
+        }
+
+        function formatKey(key) {
+            return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); // Ganti _ dengan spasi, kapitalisasi tiap kata
+        }
+
+
+        // --- Panggil Gemini API ---
+        async function callGeminiAPI(apiKey, descriptiveText) {
+            const instruction = `Berdasarkan deskripsi karakteristik berikut, buatlah sebuah prompt yang ringkas, koheren, dan sangat deskriptif, cocok untuk AI image generator. Gabungkan semua elemen secara alami menjadi satu paragraf atau kalimat deskriptif yang padat. HANYA berikan teks promptnya saja, tanpa penjelasan tambahan atau pembukaan/penutupan. Deskripsi:`;
+            
+            const fullPromptForGemini = `${instruction}\n\n"${descriptiveText}"`;
+
+            try {
+                const response = await fetch(GEMINI_API_ENDPOINT + apiKey, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{
+                                text: fullPromptForGemini
+                            }]
+                        }],
+                        // Opsional: Tambahkan safetySettings dan generationConfig jika perlu
+                        // "safetySettings": [
+                        //   { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
+                        //   { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
+                        //   { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE" },
+                        //   { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE" }
+                        // ],
+                        // "generationConfig": {
+                        //   "temperature": 0.7,
+                        //   "topK": 1,
+                        //   "topP": 1,
+                        //   "maxOutputTokens": 256,
+                        // }
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Gemini API Error Response:', errorData);
+                    throw new Error(`API Error (${response.status}): ${errorData.error?.message || response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
+                    return data.candidates[0].content.parts[0].text.trim();
+                } else if (data.promptFeedback && data.promptFeedback.blockReason) {
+                     throw new Error(`Prompt diblokir oleh Gemini: ${data.promptFeedback.blockReason} - ${data.promptFeedback.safetyRatings.map(r => r.category + ': ' + r.probability).join(', ')}`);
+                } 
+                else {
+                    console.warn('Struktur respons Gemini tidak terduga:', data);
+                    throw new Error('Gagal mendapatkan teks prompt dari respons Gemini. Periksa console.');
+                }
+
+            } catch (error) {
+                console.error('Error calling Gemini API:', error);
+                throw error; // Re-throw untuk ditangani di atas
+            }
+        }
+
+        // --- Proses Utama ---
+        async function handleGeneratePrompt() {
+            const jsonString = jsonInput.value.trim();
+            if (!jsonString) {
+                displayStatus('Input JSON tidak boleh kosong.', 'error');
+                return;
+            }
+
+            let parsedJson;
+            try {
+                parsedJson = JSON.parse(jsonString);
+            } catch (error) {
+                displayStatus(`JSON tidak valid: ${error.message}`, 'error');
+                return;
+            }
+
+            const descriptiveText = jsonToDescription(parsedJson);
+            if (!descriptiveText) {
+                displayStatus('Gagal membuat deskripsi dari JSON. JSON mungkin kosong atau strukturnya tidak sesuai.', 'error');
+                return;
+            }
+            
+            intermediateDescriptionP.textContent = descriptiveText;
+            processingInfoDiv.style.display = 'block';
+            finalPromptDiv.style.display = 'none'; // Sembunyikan hasil lama
+            geminiPromptOutputP.textContent = '';
+
+
+            const availableApiKey = apiKeys.find(key => !busyApiKeys.has(key));
+
+            if (!availableApiKey) {
+                displayStatus('Semua API Key sedang sibuk atau tidak ada API Key yang tersedia. Silakan tunggu atau tambahkan API Key baru.', 'info');
+                return;
+            }
+
+            displayStatus(`Memproses dengan API Key ••••${availableApiKey.slice(-4)}...`, 'info');
+            generatePromptButton.disabled = true;
+            busyApiKeys.add(availableApiKey);
+
+            try {
+                const finalPrompt = await callGeminiAPI(availableApiKey, descriptiveText);
+                geminiPromptOutputP.textContent = finalPrompt;
+                finalPromptDiv.style.display = 'block';
+                displayStatus('Prompt berhasil dihasilkan oleh Gemini!', 'success');
+            } catch (error) {
+                displayStatus(`Error: ${error.message}`, 'error');
+                geminiPromptOutputP.textContent = `Gagal menghasilkan prompt. ${error.message}`;
+                finalPromptDiv.style.display = 'block'; // Tampilkan pesan error di box
+            } finally {
+                busyApiKeys.delete(availableApiKey);
+                generatePromptButton.disabled = apiKeys.length === 0; // Aktifkan kembali jika ada key
+            }
+        }
+        
+        // --- Utility: Tampilkan Pesan Status ---
+        function displayStatus(message, type = 'info') { // type bisa 'info', 'success', 'error'
+            statusContainer.innerHTML = ''; // Bersihkan pesan lama
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `status-message ${type}`;
+            messageDiv.textContent = message;
+            statusContainer.appendChild(messageDiv);
+
+            // Hapus pesan setelah beberapa detik
+            setTimeout(() => {
+                if (statusContainer.contains(messageDiv)) {
+                    statusContainer.removeChild(messageDiv);
+                }
+            }, 7000);
+        }
+
+
+        // --- Event Listeners ---
+        addApiKeyButton.addEventListener('click', addApiKey);
+        clearApiKeysButton.addEventListener('click', clearAllApiKeys);
+        generatePromptButton.addEventListener('click', handleGeneratePrompt);
+        
+        // --- Inisialisasi ---
+        loadApiKeys(); // Muat API Key saat halaman dimuat
+
+        // Contoh JSON untuk textarea (bisa dihapus jika tidak mau ada default)
+        jsonInput.value = JSON.stringify({
+            "style": "minimalist vector art",
+            "subject": "silhouette of a three dolphin",
+            "pose": "jumping in unison",
+            "composition": "clean centered layout, dynamic angle",
+            "shape": "flat with smooth, rounded edges",
+            "color_palette": {
+                "main_elements": "lemon chiffon, soft apricot",
+                "background": "faded teal ocean",
+                "accent": "deep cerulean blue for water splashes",
+                "contrast": "soft and calming but with clear distinction",
+                "shadows": "subtle, indicating gentle light source"
+            },
+            "texture": {
+                "dolphins": "matte paper-like finish",
+                "background_water": "flat tone with very light grain, subtle wave patterns"
+            },
+            "details": "tiny sparkling water droplets around dolphins",
+            "resolution_quality": "4K, sharp details",
+            "overall_vibe": "calm, joyful, aesthetic, like a modern minimalist animal poster for a serene room",
+            "lighting": "soft, diffused, as if from an overcast sky or early morning",
+            "negative_space": "ample, to emphasize the dolphins"
+        }, null, 2);
+
+    </script>
+</body>
+</html>
