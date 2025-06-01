@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JSON to Gemini Prompt Converter</title>
+    <title>Advanced JSON to Gemini Prompt Converter</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -23,14 +23,15 @@
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             width: 90%;
-            max-width: 800px;
+            max-width: 900px; /* Lebarkan sedikit untuk banyak hasil */
             margin-bottom: 20px;
         }
 
-        h1, h2 {
+        h1, h2, h3 {
             color: #1a73e8; /* Google Blue */
             text-align: center;
         }
+        h3 { margin-top: 25px; margin-bottom: 10px; }
 
         label {
             display: block;
@@ -50,7 +51,7 @@
         }
 
         textarea {
-            min-height: 150px;
+            min-height: 180px;
             resize: vertical;
         }
 
@@ -64,9 +65,10 @@
             font-size: 1rem;
             transition: background-color 0.3s ease;
             margin-right: 10px;
+            margin-bottom: 10px; /* Tambah margin bawah */
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             background-color: #1765cc;
         }
 
@@ -74,101 +76,148 @@
             background-color: #ccc;
             cursor: not-allowed;
         }
+        
+        input[type="file"] {
+            margin-bottom: 15px;
+            padding: 8px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            display: block;
+        }
 
-        .api-key-management, .json-input-area, .output-area {
+        .section-divider {
             margin-bottom: 30px;
             padding-bottom: 20px;
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid #e8eaed;
         }
-        .api-key-management:last-child, .json-input-area:last-child, .output-area:last-child {
-            border-bottom: none;
-        }
+        .section-divider:last-child { border-bottom: none; }
+
 
         #apiKeyList li {
             background-color: #e8f0fe;
-            padding: 8px;
-            margin-bottom: 5px;
+            padding: 8px 12px;
+            margin-bottom: 6px;
             border-radius: 4px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 0.9rem;
         }
         #apiKeyList button {
             background-color: #d93025; /* Google Red */
             font-size: 0.8rem;
             padding: 5px 10px;
+            margin: 0; /* Reset margin */
         }
         #apiKeyList button:hover {
             background-color: #c5221f;
         }
 
-        .output-box {
-            margin-top: 15px;
-            padding: 15px;
-            border: 1px solid #dadce0;
-            border-radius: 4px;
-            background-color: #f8f9fa;
-            white-space: pre-wrap; /* Preserve formatting of the prompt */
-            word-break: break-word;
-        }
-        .output-box h3 {
-            margin-top: 0;
-            color: #1a73e8;
+        #resultsContainer {
+            margin-top: 20px;
         }
 
-        .status-message {
+        .job-item {
+            background-color: #f8f9fa;
+            border: 1px solid #dadce0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .job-item h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #3c4043;
+            font-size: 1.1rem;
+        }
+        .job-item .api-key-used { font-weight: normal; color: #5f6368; }
+        .job-item .job-status { font-weight: bold; }
+
+        .job-item.status-pending .job-status { color: #ff8f00; } /* Amber */
+        .job-item.status-processing .job-status { color: #1976d2; } /* Blue */
+        .job-item.status-completed .job-status { color: #388e3c; } /* Green */
+        .job-item.status-failed .job-status { color: #d32f2f; } /* Red */
+        .job-item.status-skipped_duplicate .job-status { color: #757575; } /* Grey */
+
+        .intermediate-output, .final-prompt-output {
             margin-top: 10px;
             padding: 10px;
             border-radius: 4px;
         }
-        .status-message.success {
-            background-color: #e6f4ea;
-            color: #1e8e3e;
-            border: 1px solid #a8d8b6;
+        .intermediate-output {
+            border: 1px dashed #e0e0e0;
+            background: #fdfdfd;
         }
-        .status-message.error {
-            background-color: #fce8e6;
-            color: #d93025;
-            border: 1px solid #f7c4c0;
+        .intermediate-output small { display: block; margin-bottom: 5px; color: #5f6368;}
+        .intermediate-output pre, .final-prompt-output pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: #fff;
+            padding: 8px;
+            border: 1px solid #e0e0e0;
+            border-radius: 3px;
+            font-size: 0.9rem;
+            margin:0;
         }
-        .status-message.info {
-            background-color: #e8f0fe;
-            color: #1967d2;
-            border: 1px solid #aecbfa;
+        .final-prompt-output strong { display: block; margin-bottom: 5px; }
+        .final-prompt-output pre { background-color: #e8f0fe; border-color: #c6dafc;}
+
+        .job-error {
+            color: #d32f2f;
+            font-weight: bold;
+            margin-top: 8px;
+            font-size: 0.9rem;
         }
+
+        .status-message-container {
+            margin-top: 15px;
+            min-height: 40px; /* Untuk cegah lompat saat pesan muncul/hilang */
+        }
+        .status-message {
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-size: 0.95rem;
+        }
+        .status-message.success { background-color: #e6f4ea; color: #1e8e3e; border: 1px solid #a8d8b6; }
+        .status-message.error { background-color: #fce8e6; color: #d93025; border: 1px solid #f7c4c0; }
+        .status-message.info { background-color: #e8f0fe; color: #1967d2; border: 1px solid #aecbfa; }
+        .status-message.warning { background-color: #fff8e1; color: #f57c00; border: 1px solid #ffecb3; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>JSON to Gemini AI Prompt Converter</h1>
+        <h1>Advanced JSON to Gemini AI Prompt Converter</h1>
 
-        <div class="api-key-management">
+        <div class="api-key-management section-divider">
             <h2>Manajemen API Key Gemini</h2>
             <label for="apiKeyInput">Masukkan API Key Gemini:</label>
             <input type="password" id="apiKeyInput" placeholder="AIzaSy...">
             <button id="addApiKeyButton">Tambah Key</button>
             <button id="clearApiKeysButton">Hapus Semua Key</button>
-            <h3>API Keys Tersimpan:</h3>
+            <h3>API Keys Tersimpan (<span id="apiKeyCount">0</span>):</h3>
             <ul id="apiKeyList"></ul>
         </div>
 
-        <div class="json-input-area">
+        <div class="json-input-area section-divider">
             <h2>Input JSON</h2>
-            <label for="jsonInput">Masukkan JSON di sini:</label>
-            <textarea id="jsonInput" placeholder='Contoh JSON ada di kode sumber'></textarea>
-            <button id="generatePromptButton" disabled>Generate Prompt dengan Gemini</button>
+            <label for="jsonInput">Masukkan JSON (objek tunggal atau array objek) di sini:</label>
+            <textarea id="jsonInput" placeholder='Contoh: {"subject": "cat"} atau [{"subject":"dog"}, {"subject":"bird"}]'></textarea>
+            
+            <label for="jsonFileUpload">Atau unggah file .json:</label>
+            <input type="file" id="jsonFileUpload" accept=".json">
+            
+            <button id="processJsonButton" disabled>Proses JSON dengan Gemini</button>
         </div>
+        
+        <div class="status-message-container" id="statusContainer"></div>
 
         <div class="output-area">
-            <h2>Hasil</h2>
-            <div id="statusContainer"></div>
-            <div id="processingInfo" class="output-box" style="display:none;">
-                <h3>Deskripsi dari JSON (Untuk Gemini):</h3>
-                <p id="intermediateDescription"></p>
-            </div>
-            <div id="finalPrompt" class="output-box" style="display:none;">
-                <h3>Prompt dari Gemini:</h3>
-                <p id="geminiPromptOutput"></p>
+            <h2>Hasil Pemrosesan</h2>
+            <div id="resultsContainer">
+                <p>Belum ada hasil. Masukkan JSON dan klik proses.</p>
             </div>
         </div>
     </div>
@@ -176,36 +225,48 @@
     <script>
         const GEMINI_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=';
 
+        // DOM Elements
         const apiKeyInput = document.getElementById('apiKeyInput');
         const addApiKeyButton = document.getElementById('addApiKeyButton');
         const clearApiKeysButton = document.getElementById('clearApiKeysButton');
         const apiKeyListElement = document.getElementById('apiKeyList');
+        const apiKeyCountSpan = document.getElementById('apiKeyCount');
+        
         const jsonInput = document.getElementById('jsonInput');
-        const generatePromptButton = document.getElementById('generatePromptButton');
+        const jsonFileUpload = document.getElementById('jsonFileUpload');
+        const processJsonButton = document.getElementById('processJsonButton');
+        
         const statusContainer = document.getElementById('statusContainer');
-        
-        const processingInfoDiv = document.getElementById('processingInfo');
-        const intermediateDescriptionP = document.getElementById('intermediateDescription');
-        
-        const finalPromptDiv = document.getElementById('finalPrompt');
-        const geminiPromptOutputP = document.getElementById('geminiPromptOutput');
+        const resultsContainer = document.getElementById('resultsContainer');
 
+        // State
         let apiKeys = [];
-        let busyApiKeys = new Set(); // Untuk melacak API key yang sedang digunakan
+        let busyApiKeys = new Set();
+        let processedHistory = {}; // { "apiKey_jsonHash": true }
+        let jobQueue = []; // Array of { id, originalJson, jsonHash, status, resultText, errorText, apiKeyUsed, displayElement, intermediateDesc }
+        let nextJobId = 0;
 
-        // --- Manajemen API Key ---
+        // --- Hashing Utility (Async SHA-256) ---
+        async function hashStringSHA256(str) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(str);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // --- API Key Management ---
         function loadApiKeys() {
-            const storedKeys = localStorage.getItem('geminiApiKeys');
-            if (storedKeys) {
-                apiKeys = JSON.parse(storedKeys);
-            }
+            const storedKeys = localStorage.getItem('geminiApiKeysAdv');
+            apiKeys = storedKeys ? JSON.parse(storedKeys) : [];
             renderApiKeys();
-            updateGenerateButtonState();
+            updateProcessButtonState();
         }
 
         function saveApiKeys() {
-            localStorage.setItem('geminiApiKeys', JSON.stringify(apiKeys));
-            updateGenerateButtonState();
+            localStorage.setItem('geminiApiKeysAdv', JSON.stringify(apiKeys));
+            renderApiKeys();
+            updateProcessButtonState();
         }
 
         function addApiKey() {
@@ -214,7 +275,6 @@
                 apiKeys.push(key);
                 apiKeyInput.value = '';
                 saveApiKeys();
-                renderApiKeys();
                 displayStatus('API Key berhasil ditambahkan.', 'success');
             } else if (apiKeys.includes(key)) {
                 displayStatus('API Key tersebut sudah ada.', 'info');
@@ -225,36 +285,33 @@
 
         function removeApiKey(keyToRemove) {
             apiKeys = apiKeys.filter(key => key !== keyToRemove);
-            busyApiKeys.delete(keyToRemove); // Hapus juga dari busy set jika ada
+            busyApiKeys.delete(keyToRemove);
             saveApiKeys();
-            renderApiKeys();
             displayStatus('API Key berhasil dihapus.', 'success');
         }
         
         function clearAllApiKeys() {
-            if (confirm("Apakah Anda yakin ingin menghapus semua API Key?")) {
+            if (confirm("Apakah Anda yakin ingin menghapus semua API Key tersimpan?")) {
                 apiKeys = [];
                 busyApiKeys.clear();
                 saveApiKeys();
-                renderApiKeys();
                 displayStatus('Semua API Key telah dihapus.', 'success');
             }
         }
 
         function renderApiKeys() {
             apiKeyListElement.innerHTML = '';
+            apiKeyCountSpan.textContent = apiKeys.length;
             if (apiKeys.length === 0) {
                 apiKeyListElement.innerHTML = '<li>Belum ada API Key tersimpan.</li>';
             } else {
                 apiKeys.forEach(key => {
                     const li = document.createElement('li');
                     const keyText = document.createElement('span');
-                    keyText.textContent = `••••${key.slice(-8)}`; // Tampilkan sebagian untuk keamanan
-                    
+                    keyText.textContent = `••••${key.slice(-8)}`;
                     const removeButton = document.createElement('button');
                     removeButton.textContent = 'Hapus';
                     removeButton.onclick = () => removeApiKey(key);
-                    
                     li.appendChild(keyText);
                     li.appendChild(removeButton);
                     apiKeyListElement.appendChild(li);
@@ -262,18 +319,32 @@
             }
         }
 
-        function updateGenerateButtonState() {
-            generatePromptButton.disabled = apiKeys.length === 0;
+        // --- Processed History Management ---
+        function loadProcessedHistory() {
+            const storedHistory = localStorage.getItem('geminiProcessedHistoryAdv');
+            processedHistory = storedHistory ? JSON.parse(storedHistory) : {};
         }
-        
-        // --- Konversi JSON ke Deskripsi ---
+
+        function saveProcessedHistory() {
+            localStorage.setItem('geminiProcessedHistoryAdv', JSON.stringify(processedHistory));
+        }
+
+        function markAsProcessed(apiKey, jsonHash) {
+            processedHistory[`${apiKey}_${jsonHash}`] = true;
+            saveProcessedHistory();
+        }
+
+        function hasBeenProcessed(apiKey, jsonHash) {
+            return processedHistory.hasOwnProperty(`${apiKey}_${jsonHash}`);
+        }
+
+        // --- JSON to Description (Unchanged) ---
         function jsonToDescription(obj, prefix = "") {
             let description = "";
             for (const key in obj) {
                 if (Object.hasOwnProperty.call(obj, key)) {
                     const value = obj[key];
                     const currentKey = prefix ? `${prefix} ${key}` : key;
-
                     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
                         description += jsonToDescription(value, currentKey) + ", ";
                     } else if (Array.isArray(value)) {
@@ -283,176 +354,128 @@
                     }
                 }
             }
-            return description.replace(/, $/, ''); // Hapus koma terakhir
+            return description.replace(/, $/, '');
         }
-
         function formatKey(key) {
-            return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); // Ganti _ dengan spasi, kapitalisasi tiap kata
+            return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         }
 
-
-        // --- Panggil Gemini API ---
-        async function callGeminiAPI(apiKey, descriptiveText) {
+        // --- Call Gemini API (Unchanged, except logging context) ---
+        async function callGeminiAPI(apiKey, descriptiveText, jobId) {
             const instruction = `Berdasarkan deskripsi karakteristik berikut, buatlah sebuah prompt yang ringkas, koheren, dan sangat deskriptif, cocok untuk AI image generator. Gabungkan semua elemen secara alami menjadi satu paragraf atau kalimat deskriptif yang padat. HANYA berikan teks promptnya saja, tanpa penjelasan tambahan atau pembukaan/penutupan. Deskripsi:`;
-            
             const fullPromptForGemini = `${instruction}\n\n"${descriptiveText}"`;
 
             try {
                 const response = await fetch(GEMINI_API_ENDPOINT + apiKey, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{
-                            parts: [{
-                                text: fullPromptForGemini
-                            }]
-                        }],
-                        // Opsional: Tambahkan safetySettings dan generationConfig jika perlu
-                        // "safetySettings": [
-                        //   { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
-                        //   { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
-                        //   { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE" },
-                        //   { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE" }
-                        // ],
-                        // "generationConfig": {
-                        //   "temperature": 0.7,
-                        //   "topK": 1,
-                        //   "topP": 1,
-                        //   "maxOutputTokens": 256,
-                        // }
+                        contents: [{ parts: [{ text: fullPromptForGemini }] }],
                     }),
                 });
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    console.error('Gemini API Error Response:', errorData);
+                    console.error(`Gemini API Error (Job ${jobId}, Key ...${apiKey.slice(-4)}):`, errorData);
                     throw new Error(`API Error (${response.status}): ${errorData.error?.message || response.statusText}`);
                 }
-
                 const data = await response.json();
-                
-                if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
+                if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
                     return data.candidates[0].content.parts[0].text.trim();
-                } else if (data.promptFeedback && data.promptFeedback.blockReason) {
-                     throw new Error(`Prompt diblokir oleh Gemini: ${data.promptFeedback.blockReason} - ${data.promptFeedback.safetyRatings.map(r => r.category + ': ' + r.probability).join(', ')}`);
-                } 
-                else {
-                    console.warn('Struktur respons Gemini tidak terduga:', data);
-                    throw new Error('Gagal mendapatkan teks prompt dari respons Gemini. Periksa console.');
+                } else if (data.promptFeedback?.blockReason) {
+                     throw new Error(`Prompt diblokir oleh Gemini (Job ${jobId}): ${data.promptFeedback.blockReason}`);
+                } else {
+                    console.warn(`Struktur respons Gemini tidak terduga (Job ${jobId}):`, data);
+                    throw new Error('Gagal mendapatkan teks prompt dari respons Gemini.');
                 }
-
             } catch (error) {
-                console.error('Error calling Gemini API:', error);
-                throw error; // Re-throw untuk ditangani di atas
+                console.error(`Error calling Gemini API (Job ${jobId}, Key ...${apiKey.slice(-4)}):`, error);
+                throw error;
             }
         }
 
-        // --- Proses Utama ---
-        async function handleGeneratePrompt() {
-            const jsonString = jsonInput.value.trim();
-            if (!jsonString) {
-                displayStatus('Input JSON tidak boleh kosong.', 'error');
-                return;
-            }
-
-            let parsedJson;
-            try {
-                parsedJson = JSON.parse(jsonString);
-            } catch (error) {
-                displayStatus(`JSON tidak valid: ${error.message}`, 'error');
-                return;
-            }
-
-            const descriptiveText = jsonToDescription(parsedJson);
-            if (!descriptiveText) {
-                displayStatus('Gagal membuat deskripsi dari JSON. JSON mungkin kosong atau strukturnya tidak sesuai.', 'error');
-                return;
-            }
-            
-            intermediateDescriptionP.textContent = descriptiveText;
-            processingInfoDiv.style.display = 'block';
-            finalPromptDiv.style.display = 'none'; // Sembunyikan hasil lama
-            geminiPromptOutputP.textContent = '';
-
-
-            const availableApiKey = apiKeys.find(key => !busyApiKeys.has(key));
-
-            if (!availableApiKey) {
-                displayStatus('Semua API Key sedang sibuk atau tidak ada API Key yang tersedia. Silakan tunggu atau tambahkan API Key baru.', 'info');
-                return;
-            }
-
-            displayStatus(`Memproses dengan API Key ••••${availableApiKey.slice(-4)}...`, 'info');
-            generatePromptButton.disabled = true;
-            busyApiKeys.add(availableApiKey);
+        // --- Job Processing Logic ---
+        async function processSingleJsonJob(job, apiKey) {
+            busyApiKeys.add(apiKey);
+            job.apiKeyUsed = apiKey.slice(-8); // Tampilkan lebih banyak dari API key
+            job.status = 'processing';
+            updateJobDisplay(job);
 
             try {
-                const finalPrompt = await callGeminiAPI(availableApiKey, descriptiveText);
-                geminiPromptOutputP.textContent = finalPrompt;
-                finalPromptDiv.style.display = 'block';
-                displayStatus('Prompt berhasil dihasilkan oleh Gemini!', 'success');
+                job.intermediateDesc = jsonToDescription(job.originalJson);
+                if (!job.intermediateDesc) {
+                    throw new Error('Gagal membuat deskripsi dari JSON.');
+                }
+                updateJobDisplay(job); // Tampilkan deskripsi intermediate
+
+                const finalPrompt = await callGeminiAPI(apiKey, job.intermediateDesc, job.id);
+                job.resultText = finalPrompt;
+                job.status = 'completed';
+                markAsProcessed(apiKey, job.jsonHash);
             } catch (error) {
-                displayStatus(`Error: ${error.message}`, 'error');
-                geminiPromptOutputP.textContent = `Gagal menghasilkan prompt. ${error.message}`;
-                finalPromptDiv.style.display = 'block'; // Tampilkan pesan error di box
+                job.errorText = error.message;
+                job.status = 'failed';
             } finally {
-                busyApiKeys.delete(availableApiKey);
-                generatePromptButton.disabled = apiKeys.length === 0; // Aktifkan kembali jika ada key
+                busyApiKeys.delete(apiKey);
+                updateJobDisplay(job);
+                processJobQueue(); // Coba proses job lain jika ada API key bebas
             }
         }
-        
-        // --- Utility: Tampilkan Pesan Status ---
-        function displayStatus(message, type = 'info') { // type bisa 'info', 'success', 'error'
-            statusContainer.innerHTML = ''; // Bersihkan pesan lama
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `status-message ${type}`;
-            messageDiv.textContent = message;
-            statusContainer.appendChild(messageDiv);
 
-            // Hapus pesan setelah beberapa detik
-            setTimeout(() => {
-                if (statusContainer.contains(messageDiv)) {
-                    statusContainer.removeChild(messageDiv);
+        async function processJobQueue() {
+            if (jobQueue.every(j => j.status !== 'pending' && j.status !== 'processing_hash')) {
+                 updateProcessButtonState(); // Semua job sudah ditangani (completed, failed, skipped)
+                 // Periksa apakah semua selesai untuk pesan akhir
+                 const allNonPending = jobQueue.every(j => j.status !== 'pending' && j.status !== 'processing_hash' && j.status !== 'processing');
+                 if(allNonPending && jobQueue.length > 0) {
+                     const successes = jobQueue.filter(j => j.status === 'completed').length;
+                     const failures = jobQueue.filter(j => j.status === 'failed').length;
+                     const skipped = jobQueue.filter(j => j.status === 'skipped_duplicate').length;
+                     displayStatus(`Pemrosesan selesai. Sukses: ${successes}, Gagal: ${failures}, Dilewati: ${skipped}.`, 'info');
+                 }
+                 return;
+            }
+
+            for (const job of jobQueue) {
+                if (job.status === 'pending') {
+                    const availableApiKey = apiKeys.find(key => !busyApiKeys.has(key));
+                    if (availableApiKey) {
+                        job.status = 'processing_hash'; // Status sementara saat hashing
+                        updateJobDisplay(job);
+                        try {
+                            const jsonString = JSON.stringify(job.originalJson);
+                            job.jsonHash = await hashStringSHA256(jsonString);
+
+                            if (hasBeenProcessed(availableApiKey, job.jsonHash)) {
+                                job.status = 'skipped_duplicate';
+                                job.resultText = `JSON ini sudah diproses dengan API Key ...${availableApiKey.slice(-8)}.`;
+                                job.apiKeyUsed = availableApiKey.slice(-8);
+                                updateJobDisplay(job);
+                                processJobQueue(); // Cek job lain karena API key ini masih bebas
+                            } else {
+                                // Tidak pakai await di sini, biarkan berjalan di background
+                                processSingleJsonJob(job, availableApiKey);
+                            }
+                        } catch(e) {
+                            job.status = 'failed';
+                            job.errorText = `Error membuat JSON hash: ${e.message}`;
+                            updateJobDisplay(job);
+                            processJobQueue(); // Coba job lain
+                        }
+                    } else {
+                        // Tidak ada API Key tersedia, tunggu.
+                        // Loop akan berhenti, processJobQueue akan dipanggil lagi saat API key bebas.
+                        break; 
+                    }
                 }
-            }, 7000);
+            }
+            updateProcessButtonState();
         }
 
-
-        // --- Event Listeners ---
-        addApiKeyButton.addEventListener('click', addApiKey);
-        clearApiKeysButton.addEventListener('click', clearAllApiKeys);
-        generatePromptButton.addEventListener('click', handleGeneratePrompt);
-        
-        // --- Inisialisasi ---
-        loadApiKeys(); // Muat API Key saat halaman dimuat
-
-        // Contoh JSON untuk textarea (bisa dihapus jika tidak mau ada default)
-        jsonInput.value = JSON.stringify({
-            "style": "minimalist vector art",
-            "subject": "silhouette of a three dolphin",
-            "pose": "jumping in unison",
-            "composition": "clean centered layout, dynamic angle",
-            "shape": "flat with smooth, rounded edges",
-            "color_palette": {
-                "main_elements": "lemon chiffon, soft apricot",
-                "background": "faded teal ocean",
-                "accent": "deep cerulean blue for water splashes",
-                "contrast": "soft and calming but with clear distinction",
-                "shadows": "subtle, indicating gentle light source"
-            },
-            "texture": {
-                "dolphins": "matte paper-like finish",
-                "background_water": "flat tone with very light grain, subtle wave patterns"
-            },
-            "details": "tiny sparkling water droplets around dolphins",
-            "resolution_quality": "4K, sharp details",
-            "overall_vibe": "calm, joyful, aesthetic, like a modern minimalist animal poster for a serene room",
-            "lighting": "soft, diffused, as if from an overcast sky or early morning",
-            "negative_space": "ample, to emphasize the dolphins"
-        }, null, 2);
-
-    </script>
-</body>
-</html>
+        // --- UI for Jobs ---
+        function createJobDisplayElement(job) {
+            const jobDiv = document.createElement('div');
+            jobDiv.className = `job-item status-${job.status}`;
+            jobDiv.id = `job-display-${job.id}`;
+            jobDiv.innerHTML = `
+                <h4>JSON Objek #${job.id} (API Key: <span class="api-key-used">Menunggu</s
